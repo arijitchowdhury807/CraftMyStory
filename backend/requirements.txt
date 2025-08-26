@@ -1,0 +1,13 @@
+Flask==3.0.2
+flask-cors==4.0.0
+flask-bcrypt==1.0.1
+google-cloud-speech
+google-cloud-translate
+google-cloud-texttospeech
+google-cloud-aiplatform
+google-cloud-bigquery
+firebase-admin
+pymongo
+stripe
+requests
+python-dotenv==1.1.1
