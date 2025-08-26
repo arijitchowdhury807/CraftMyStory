@@ -16,8 +16,13 @@
 
 import os
 from datetime import timedelta
+from pymongo import MongoClient
 
 class Config:
     MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/craftmystory")
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "supersecretkey")  # Change in prod
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(days=7)
+
+# Initialize MongoDB once
+client = MongoClient(Config.MONGO_URI)
+db = client.get_database()

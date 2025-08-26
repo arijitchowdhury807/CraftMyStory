@@ -1,13 +1,21 @@
 Flask==3.0.2
 flask-cors==4.0.0
 flask-bcrypt==1.0.1
-google-cloud-speech
-google-cloud-translate
-google-cloud-texttospeech
-google-cloud-aiplatform
-google-cloud-bigquery
-firebase-admin
-pymongo
-stripe
-requests
+
+# Google Cloud APIs
+google-cloud-speech==2.25.1
+google-cloud-translate==3.15.5
+google-cloud-texttospeech==2.27.0
+google-cloud-aiplatform==1.64.0
+google-cloud-bigquery==3.21.0
+
+# Firebase + Mongo + Stripe
+firebase-admin==6.5.0
+pymongo==4.8.0
+stripe==9.5.0
+
+# Utilities
+requests==2.32.3
 python-dotenv==1.1.1
+pydub==0.25.1
+gtts==2.5.1

@@ -63,99 +63,36 @@
 # if __name__ == '__main__':
 #     app.run(debug=True)
 
-from flask import Flask, request, jsonify
+from flask import Flask
 from flask_bcrypt import Bcrypt
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
-from pymongo import MongoClient
+from flask_jwt_extended import JWTManager
+from dotenv import load_dotenv
 import os
 
-# Blockchain service
+# Blockchain
 from services.blockchain import Blockchain
 
-app = Flask(__name__)
-
+# Blueprints
+from routes.auth import auth_bp
 from routes.trust import trust_bp
-app.register_blueprint(trust_bp, url_prefix="/trust")
-from dotenv import load_dotenv
+from routes.content import content_bp
+from routes.test_route import test_bp
 
-load_dotenv()  # take environment variables from .env
+load_dotenv()
 
-# Config
-app.config["JWT_SECRET_KEY"] = "supersecretkey"  # change in production
-MONGO_URI = os.getenv("MONGO_URI")
+app = Flask(__name__)
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "supersecretkey")
 
 # Setup
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
-client = MongoClient(MONGO_URI)
-db = client["craftmystory"]
-users_collection = db["users"]
-artisans_collection = db["artisans"]
-
-# Blockchain instance
 blockchain = Blockchain()
 
-# -------------------------
-# Signup (user + artisan + blockchain)
-# -------------------------
-@app.route("/signup", methods=["POST"])
-def signup():
-    data = request.json
-    email = data.get("email")
-    password = data.get("password")
-    artisan_data = {
-        "name": data.get("name"),
-        "craft": data.get("craft"),
-        "location": data.get("location")
-    }
+# Register Blueprints
+app.register_blueprint(auth_bp, url_prefix="/auth")
+app.register_blueprint(trust_bp, url_prefix="/trust")
+app.register_blueprint(content_bp, url_prefix="/content")
+app.register_blueprint(test_bp, url_prefix="/test")
 
-    if users_collection.find_one({"email": email}):
-        return jsonify({"error": "User already exists"}), 400
-
-    # Save user in MongoDB
-    hashed_pw = bcrypt.generate_password_hash(password).decode("utf-8")
-    users_collection.insert_one({"email": email, "password": hashed_pw})
-    artisans_collection.insert_one({"email": email, **artisan_data})
-
-    # Record on blockchain
-    blockchain.add_transaction(user_id=email, artisan_data=artisan_data)
-    blockchain.mine_block()
-
-    # Generate token
-    access_token = create_access_token(identity=email)
-    return jsonify({"message": "Signup successful", "token": access_token}), 201
-
-
-# -------------------------
-# Login
-# -------------------------
-@app.route("/login", methods=["POST"])
-def login():
-    data = request.get_json()
-    email = data.get("email")
-    password = data.get("password")
-
-    user = users_collection.find_one({"email": email})
-    if not user or not bcrypt.check_password_hash(user["password"], password):
-        return jsonify({"error": "Invalid credentials"}), 401
-
-    access_token = create_access_token(identity=email)
-    return jsonify({"message": "Login successful", "token": access_token}), 200
-
-
-# -------------------------
-# Profile (JWT Protected)
-# -------------------------
-@app.route("/me", methods=["GET"])
-@jwt_required()
-def me():
-    current_user = get_jwt_identity()
-    artisan = artisans_collection.find_one({"email": current_user}, {"_id": 0, "password": 0})
-    return jsonify({"user": current_user, "artisan_profile": artisan}), 200
-
-
-# -------------------------
-# Run App
-# -------------------------
 if __name__ == "__main__":
     app.run(debug=True)
