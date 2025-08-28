@@ -50,3 +50,5 @@ Thumbs.db
 *.lock
 .env
 secrets/
+backend_storage/
+placeholders_reel/
