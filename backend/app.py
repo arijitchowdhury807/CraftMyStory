@@ -77,6 +77,10 @@ from routes.auth import auth_bp
 from routes.trust import trust_bp
 from routes.content import content_bp
 from routes.test_route import test_bp
+from routes.media import media_bp
+
+# CORS
+from flask_cors import CORS
 
 load_dotenv()
 
@@ -88,11 +92,18 @@ bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 blockchain = Blockchain()
 
+# Enable CORS (for frontend requests)
+CORS(app, resources={
+    r"/auth/*": {"origins": "*"},    # allow all origins for /auth routes
+    r"/media/*": {"origins": "*"}    # optional: allow uploads from frontend
+})
+
 # Register Blueprints
 app.register_blueprint(auth_bp, url_prefix="/auth")
 app.register_blueprint(trust_bp, url_prefix="/trust")
 app.register_blueprint(content_bp, url_prefix="/content")
 app.register_blueprint(test_bp, url_prefix="/test")
+app.register_blueprint(media_bp, url_prefix="/media")
 
 if __name__ == "__main__":
     app.run(debug=True)
