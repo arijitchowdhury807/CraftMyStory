@@ -93,10 +93,13 @@ jwt = JWTManager(app)
 blockchain = Blockchain()
 
 # Enable CORS (for frontend requests)
-CORS(app, resources={
-    r"/auth/*": {"origins": "*"},    # allow all origins for /auth routes
-    r"/media/*": {"origins": "*"}    # optional: allow uploads from frontend
-})
+# Enable CORS for all routes and allow Authorization header
+CORS(
+    app,
+    resources={r"/*": {"origins": "*"}},
+    supports_credentials=True,
+    allow_headers=["Content-Type", "Authorization"]
+)
 
 # Register Blueprints
 app.register_blueprint(auth_bp, url_prefix="/auth")

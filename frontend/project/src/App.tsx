@@ -108,7 +108,7 @@ import { ArtistDashboard } from './components/ArtistDashboard';
 import { ProductModal } from './components/ProductModal';
 import { AuthModal } from './components/AuthModal';
 import { mockProducts } from './data/mockData';
-import type { Product, User } from './types';
+import type { Product, User } from './types/index.ts';
 
 const API_BASE = "http://127.0.0.1:5000";
 

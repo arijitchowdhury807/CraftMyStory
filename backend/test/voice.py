@@ -2,7 +2,7 @@
 from gtts import gTTS
 
 # Dummy Hindi text for testing
-text = "यह एक हस्तनिर्मित मोमबत्ती है"
+text = "I am arijit chowdhury and I have made an oil painting using oil paints that costs upto 20 dollars."
 
 # Convert text to speech
 tts = gTTS(text, lang="hi")

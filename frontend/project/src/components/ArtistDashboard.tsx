@@ -1,29 +1,43 @@
-import React, { useState } from 'react';
-import { Plus, Upload, Wand2, Eye, Heart, Mic } from 'lucide-react';
-import type { Product, User } from '../types';
+import React, { useState } from "react";
+import { Plus, Mic, X } from "lucide-react";
+import axios from "axios";
+import type { Product, User } from "../types/index.ts";
+import { Dialog } from "@headlessui/react";
 
 interface ArtistDashboardProps {
   currentUser: User | null;
   products: Product[];
-  onAddProduct: (product: Omit<Product, 'id' | 'artistId' | 'createdAt'>) => void;
+  onAddProduct: (
+    product: Omit<Product, "id" | "artistId" | "createdAt">
+  ) => void;
 }
 
-export function ArtistDashboard({ currentUser, products, onAddProduct }: ArtistDashboardProps) {
+const API_BASE = "http://127.0.0.1:5000";
+
+export function ArtistDashboard({
+  currentUser,
+  products,
+  onAddProduct,
+}: ArtistDashboardProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    price: '',
-    category: '',
-    tags: ''
+    name: "",
+    description: "",
+    price: "",
+    category: "",
+    tags: "",
+    language: "en",
   });
-
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [audioURL, setAudioURL] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // Toggle Recording
+  // Detail modal state
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  // Toggle recording
   const toggleRecording = async () => {
     if (recording) {
       mediaRecorder?.stop();
@@ -34,16 +48,60 @@ export function ArtistDashboard({ currentUser, products, onAddProduct }: ArtistD
         const recorder = new MediaRecorder(stream);
         setMediaRecorder(recorder);
         const chunks: BlobPart[] = [];
+
         recorder.ondataavailable = (e) => chunks.push(e.data);
-        recorder.onstop = () => {
-          const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+
+        recorder.onstop = async () => {
+          const audioBlob = new Blob(chunks, { type: "audio/wav" });
           setAudioURL(URL.createObjectURL(audioBlob));
+          await uploadAudio(audioBlob);
         };
+
         recorder.start();
         setRecording(true);
       } catch (error) {
-        alert('Microphone access denied.');
+        alert("Microphone access denied.");
       }
+    }
+  };
+
+  // Upload audio to backend and update description
+  const uploadAudio = async (audioBlob: Blob) => {
+    try {
+      setLoading(true);
+      const formDataUpload = new FormData();
+      formDataUpload.append("file", audioBlob, "recorded_audio.wav");
+      formDataUpload.append("language", formData.language);
+      formDataUpload.append("mode", "description");
+
+      const token = localStorage.getItem("token");
+      if (!token) {
+        alert("You must be logged in to generate content.");
+        return;
+      }
+
+      const res = await axios.post(
+        `${API_BASE}/content/voice-generate`,
+        formDataUpload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+          withCredentials: true,
+        }
+      );
+
+      // Auto-fill description field
+      setFormData((prev) => ({
+        ...prev,
+        description: res.data.generated_text,
+      }));
+    } catch (err: any) {
+      console.error("Error uploading audio:", err.response?.data || err.message);
+      alert("Failed to generate description from voice. Check console for details.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -54,54 +112,50 @@ export function ArtistDashboard({ currentUser, products, onAddProduct }: ArtistD
     }
   };
 
+  // Form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    const newProduct: Omit<Product, 'id' | 'artistId' | 'createdAt'> = {
+    const newProduct: Omit<Product, "id" | "artistId" | "createdAt"> = {
       name: formData.name,
       description: formData.description,
       price: parseFloat(formData.price),
-      images: selectedImages.map(file => URL.createObjectURL(file)), // Preview only, replace with uploaded URLs in real case
+      images: selectedImages.map((file) => URL.createObjectURL(file)),
       audio: audioURL || null,
       category: formData.category,
-      tags: formData.tags.split(',').map(tag => tag.trim()),
+      tags: formData.tags.split(",").map((tag) => tag.trim()),
       aiGenerated: false,
       likes: 0,
-      views: 0
+      views: 0,
     };
-
     onAddProduct(newProduct);
-
     // Reset form
     setFormData({
-      name: '',
-      description: '',
-      price: '',
-      category: '',
-      tags: ''
+      name: "",
+      description: "",
+      price: "",
+      category: "",
+      tags: "",
+      language: "en",
     });
     setSelectedImages([]);
     setAudioURL(null);
     setShowAddForm(false);
   };
 
-  const generateAIReel = (productId: string) => {
-    alert('AI reel generation started! This would integrate with an AI video service in production.');
-  };
-
   if (!currentUser?.isArtist) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h2>
-          <p className="text-gray-600">You need to be registered as an artist to access the dashboard.</p>
-        </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h2>
+        <p className="text-gray-600">
+          You need to be registered as an artist to access the dashboard.
+        </p>
       </div>
     );
   }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Artist Dashboard</h1>
@@ -111,51 +165,124 @@ export function ArtistDashboard({ currentUser, products, onAddProduct }: ArtistD
           onClick={() => setShowAddForm(true)}
           className="bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center"
         >
-          <Plus className="h-5 w-5 mr-2" />
-          Add Artwork
+          <Plus className="h-5 w-5 mr-2" /> Add Artwork
         </button>
       </div>
 
+      {/* Add Artwork Form */}
       {showAddForm && (
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
           <h3 className="text-lg font-semibold mb-4">Add New Artwork</h3>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form
+            onSubmit={handleSubmit}
+            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          >
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Name
+              </label>
               <input
                 type="text"
                 required
                 value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, name: e.target.value }))
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Price ($)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Price ($)
+              </label>
               <input
                 type="number"
                 required
                 value={formData.price}
-                onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, price: e.target.value }))
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
+
+            {/* Voice Recording */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Record Your Voice
+              </label>
+              <button
+                type="button"
+                onClick={toggleRecording}
+                className={`flex items-center px-4 py-2 rounded-md ${
+                  recording ? "bg-red-500" : "bg-purple-600"
+                } text-white`}
+              >
+                <Mic className="h-4 w-4 mr-2" />
+                {recording ? "Stop Recording" : "Start Recording"}
+              </button>
+              {audioURL && (
+                <audio controls src={audioURL} className="mt-2 w-full"></audio>
+              )}
+              {loading && (
+                <p className="text-sm text-gray-500 mt-2">
+                  Processing voice input...
+                </p>
+              )}
+            </div>
+
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description
+              </label>
               <textarea
                 required
                 rows={3}
                 value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
+
+            {/* Language Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Language
+              </label>
+              <select
+                value={formData.language}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    language: e.target.value,
+                  }))
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="en">English</option>
+                <option value="hi">Hindi</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+              </select>
+            </div>
+
+            {/* Category */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Category
+              </label>
               <select
                 required
                 value={formData.category}
-                onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, category: e.target.value }))
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
                 <option value="">Select category</option>
@@ -166,13 +293,19 @@ export function ArtistDashboard({ currentUser, products, onAddProduct }: ArtistD
                 <option value="Photography">Photography</option>
               </select>
             </div>
+
+            {/* Tags */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Tags (comma-separated)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tags (comma-separated)
+              </label>
               <input
                 type="text"
                 required
                 value={formData.tags}
-                onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, tags: e.target.value }))
+                }
                 placeholder="abstract, modern, colorful"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
@@ -180,7 +313,9 @@ export function ArtistDashboard({ currentUser, products, onAddProduct }: ArtistD
 
             {/* Image Upload */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Choose Photo</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Choose Photo
+              </label>
               <input
                 type="file"
                 multiple
@@ -189,23 +324,9 @@ export function ArtistDashboard({ currentUser, products, onAddProduct }: ArtistD
                 className="w-full"
               />
               {selectedImages.length > 0 && (
-                <p className="text-xs text-gray-500 mt-1">{selectedImages.length} file(s) selected</p>
-              )}
-            </div>
-
-            {/* Voice Recording */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Record Your Voice</label>
-              <button
-                type="button"
-                onClick={toggleRecording}
-                className={`flex items-center px-4 py-2 rounded-md ${recording ? 'bg-red-500' : 'bg-purple-600'} text-white`}
-              >
-                <Mic className="h-4 w-4 mr-2" />
-                {recording ? 'Stop Recording' : 'Start Recording'}
-              </button>
-              {audioURL && (
-                <audio controls src={audioURL} className="mt-2 w-full"></audio>
+                <p className="text-xs text-gray-500 mt-1">
+                  {selectedImages.length} file(s) selected
+                </p>
               )}
             </div>
 
@@ -228,10 +349,14 @@ export function ArtistDashboard({ currentUser, products, onAddProduct }: ArtistD
         </div>
       )}
 
-      {/* Product List */}
+      {/* Product Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {products.map((product) => (
-          <div key={product.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div
+            key={product.id}
+            onClick={() => setSelectedProduct(product)}
+            className="cursor-pointer bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition"
+          >
             <img
               src={product.images[0]}
               alt={product.name}
@@ -239,61 +364,58 @@ export function ArtistDashboard({ currentUser, products, onAddProduct }: ArtistD
             />
             <div className="p-4">
               <h3 className="font-semibold text-lg mb-2">{product.name}</h3>
-              <p className="text-gray-600 text-sm mb-3 line-clamp-2">{product.description}</p>
-
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-lg font-bold text-gray-900">${product.price}</span>
-                <div className="flex items-center space-x-4 text-gray-500">
-                  <div className="flex items-center">
-                    <Heart className="h-4 w-4 mr-1" />
-                    <span className="text-sm">{product.likes}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Eye className="h-4 w-4 mr-1" />
-                    <span className="text-sm">{product.views}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <div className="flex flex-wrap gap-1">
-                  {product.tags.slice(0, 2).map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-
-                {!product.aiGenerated && (
-                  <button
-                    onClick={() => generateAIReel(product.id)}
-                    className="flex items-center px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs rounded-full hover:from-purple-600 hover:to-pink-600 transition-colors"
-                  >
-                    <Wand2 className="h-3 w-3 mr-1" />
-                    AI Reel
-                  </button>
-                )}
-              </div>
+              <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                {product.description}
+              </p>
             </div>
           </div>
         ))}
       </div>
 
-      {products.length === 0 && (
-        <div className="text-center py-12">
-          <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No artwork yet</h3>
-          <p className="text-gray-600 mb-4">Start by adding your first piece of artwork</p>
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors"
-          >
-            Add Your First Artwork
-          </button>
-        </div>
+      {/* Detail Modal */}
+      {selectedProduct && (
+        <Dialog
+          open={true}
+          onClose={() => setSelectedProduct(null)}
+          className="relative z-50"
+        >
+          <div className="fixed inset-0 bg-black/50" aria-hidden="true" />
+          <div className="fixed inset-0 flex items-center justify-center p-4">
+            <Dialog.Panel className="mx-auto max-w-lg bg-white rounded-lg shadow-xl p-6 relative">
+              <button
+                onClick={() => setSelectedProduct(null)}
+                className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              <Dialog.Title className="text-xl font-bold mb-4">
+                {selectedProduct.name}
+              </Dialog.Title>
+
+              <img
+                src={selectedProduct.images[0]}
+                alt={selectedProduct.name}
+                className="w-full h-64 object-cover rounded-md mb-4"
+              />
+
+              <p className="text-gray-700 mb-2">
+                <strong>Description:</strong> {selectedProduct.description}
+              </p>
+              <p className="text-gray-700 mb-2">
+                <strong>Category:</strong> {selectedProduct.category}
+              </p>
+              <p className="text-gray-700 mb-2">
+                <strong>Price:</strong> ${selectedProduct.price}
+              </p>
+              <p className="text-gray-700 mb-2">
+                <strong>Tags:</strong> {selectedProduct.tags.join(", ")}
+              </p>
+
+           
+            </Dialog.Panel>
+          </div>
+        </Dialog>
       )}
     </div>
   );

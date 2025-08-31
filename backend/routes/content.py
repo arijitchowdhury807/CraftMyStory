@@ -19,7 +19,9 @@ def voice_generate_content():
             return jsonify({"error": "Audio file is required"}), 400
 
         audio_file = request.files["file"]
+        print(audio_file)
         target_lang = request.form.get("language", "en")
+        print(target_lang)
         mode = request.form.get("mode", "description")
 
         # Save temp file
@@ -29,15 +31,19 @@ def voice_generate_content():
 
         # 1. Speech → Text
         raw_text = transcribe_audio(temp_path)
+        print(raw_text)
 
         # 2. Translate to English for AI processing
         translated_prompt = translate_text(raw_text, target_lang="en")
+        print(translated_prompt)
 
         # 3. Generate AI content
         generated_en = generate_content(translated_prompt, "en", mode)
+        print(generated_en)
 
         # 4. Translate back into user’s chosen language
         final_output = translate_text(generated_en, target_lang)
+        print(final_output)
 
         # Save in MongoDB
         record = {
@@ -59,3 +65,4 @@ def voice_generate_content():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
