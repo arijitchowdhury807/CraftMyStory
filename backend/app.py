@@ -78,6 +78,7 @@ from routes.trust import trust_bp
 from routes.content import content_bp
 from routes.test_route import test_bp
 from routes.media import media_bp
+from routes.marketplace import marketplace_bp
 
 # CORS
 from flask_cors import CORS
@@ -107,6 +108,7 @@ app.register_blueprint(trust_bp, url_prefix="/trust")
 app.register_blueprint(content_bp, url_prefix="/content")
 app.register_blueprint(test_bp, url_prefix="/test")
 app.register_blueprint(media_bp, url_prefix="/media")
+app.register_blueprint(marketplace_bp, url_prefix="/marketplace")
 
 if __name__ == "__main__":
     app.run(debug=True)
